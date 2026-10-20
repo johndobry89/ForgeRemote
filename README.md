@@ -1,56 +1,32 @@
 # Forge Remote
 
-**Status: repository voorbereid voor Codex; applicatie nog niet gebouwd of getest.**
+A private iPhone PWA and native macOS menu bar companion for viewing and controlling your own Mac. **First implementation; Mac/iPhone integration is NOT TESTED.** No public deployment or remote relay.
 
-Forge Remote is een privéproject om een eigen Mac veilig vanaf een iPhone te bekijken en te bedienen.
+## Implemented
 
-## Productvisie
+- React/TypeScript/Vite PWA: Desktop, Trackpad, Keyboard and Actions, touch drag, scroll, text and shortcut controls; standalone manifest, raster icons, light/dark mode, safe areas and static-only service worker.
+- macOS 14+ SwiftUI companion: loopback-only Vapor service, temporary pairing code + explicit local approval, Keychain device registry, credential revocation, local Stop/Resume.
+- ScreenCaptureKit JPEG pipeline (8fps, 1280px maximum width, one frame awaiting acknowledgement), CGEvent pointer/button/scroll/text/key input, bounds/epoch validation and disconnect cleanup.
+- Same-origin HTTPS authentication with Secure/HttpOnly/SameSite cookies, origin checks, bounded messages/mailboxes, expiry and rate limits. No plaintext remote-control fallback.
 
-- **iPhone:** een mobiele webapp (PWA), te openen in Safari en als webapp op het beginscherm te zetten. Chrome-ondersteuning waar mogelijk.
-- **Mac:** een native Swift/SwiftUI-companion die, met expliciete systeempermissies, schermbeelden beschikbaar maakt en geautoriseerde invoer verwerkt.
-- **Verbinding:** eerst veilig via privétoegang en een vertrouwde HTTPS-origin; geen standaard publieke internetpoort.
-- **GitHub:** centrale codebase en traceerbaar ontwikkelproces met branches en reviews.
+## Actually verified here
 
-Een PWA kan niet zelfstandig macOS besturen: de companion blijft noodzakelijk. De PWA-installatie is een gebruikersstap, niet een vervanging voor netwerktoegang of beveiliging.
+Linux, Node 24.19.0: `npm run build`, 15 Vitest tests and 2 Chromium browser tests passed. Browser tests cover the actual shell at mobile/desktop sizes and refusal of plaintext; they do **not** prove remote control or iOS compatibility. Production dependency audit reported no vulnerabilities.
 
-## Repositorystatus
+Swift/macOS build, system permissions, Keychain integration, real capture/input, trusted private HTTPS and physical iPhone installation: **NOT TESTED / BLOCKED by the Linux execution environment**. CI includes a macOS build/test job; its presence does not establish that it passed. See [validation](docs/VALIDATION.md).
 
-Deze repository bevat nu de **projectinstructies, architectuurafspraken, securitykaders en bouwvolgorde**. Er zijn nog geen draaiende Mac- of webapp, geen apparaatkoppeling en geen gevalideerde remote-controlfunctionaliteiten. Status mag pas wijzigen op basis van echte builds en tests.
+## Develop
 
-## Voor Codex
-
-1. Lees eerst [AGENTS.md](AGENTS.md), daarna [Architecture](docs/ARCHITECTURE.md), [Security](docs/SECURITY.md) en [Roadmap](docs/ROADMAP.md).
-2. Inspecteer de werkelijke ontwikkelomgeving; veronderstel geen Xcode, Apple SDK, Mac-toegang of iPhone-testapparaat.
-3. Bouw de eerste verticale keten: mobiele interface → lokale companion → geauthenticeerde sessie → echte schermframes → echte inputevents.
-4. Zorg eerst voor een reproduceerbare lokale build. Breid pas uit na werkende basisbediening.
-5. Documenteer in de PR wat **IMPLEMENTED**, **VERIFIED**, **NOT TESTED** of **BLOCKED** is.
-
-## Beoogde repository-indeling
-
-```text
-apps/
-  mac/       # Swift/SwiftUI macOS companion (door Codex te maken)
-  web/       # TypeScript/React/Vite PWA (door Codex te maken)
-packages/
-  protocol/  # Versiebeheer van wire protocol en schema's
-docs/
-  ARCHITECTURE.md
-  SECURITY.md
-  ROADMAP.md
-  SETUP.md
-AGENTS.md
+```sh
+npm ci
+npm run build
+npm test
+npm run test:browser  # local Chromium; see SETUP for other machines
+npm run dev -w apps/web
 ```
 
-## iPhone-installatie (na implementatie)
+Frontend development binds only `127.0.0.1:5173`. It has no simulated Mac backend. Pairing requires the companion serving the built assets through a trusted private HTTPS origin.
 
-Open de uiteindelijke vertrouwde HTTPS-URL op de iPhone in Safari; gebruik **Delen → Zet op beginscherm → Open als webapp → Voeg toe**. Het toevoegen aan het beginscherm maakt de Mac niet automatisch bereikbaar. De Mac moet draaien, gekoppeld zijn en via een veilige verbinding bereikbaar zijn.
+On your Mac, follow [SETUP](docs/SETUP.md) to build the app bundle, configure private HTTPS and pair your iPhone. The first step is to run the Mac build/tests, since that toolchain was unavailable here.
 
-## Ontwikkel- en veiligheidsregels
-
-- Repository privé houden; geen sleutels, tokens, screenshots of persoonsgegevens committen.
-- Geen automatische publieke deployment, Funnel, portforwarding of productie-release.
-- Geen remote shell en geen onbeperkte externe command-executie.
-- Geen toegang tot macOS zonder zichtbare toestemming en noodzakelijke Screen Recording- en Accessibility-permissies.
-- Bewaar bewijs van uitgevoerde tests; noem een niet-uitgevoerde fysieke integratietest nooit PASS.
-
-Zie ook [SETUP](docs/SETUP.md) voor de concrete startvolgorde.
+[Architecture](docs/ARCHITECTURE.md) · [Security](docs/SECURITY.md) · [Protocol](packages/protocol/README.md) · [Roadmap](docs/ROADMAP.md)

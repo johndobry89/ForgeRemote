@@ -1,6 +1,6 @@
 # Security design — Forge Remote
 
-**Ontwerp; geen security-audit of productievalidatie uitgevoerd.**
+**Ontwerp plus eerste implementatie; geen security-audit of productievalidatie uitgevoerd.**
 
 ## Risico
 
@@ -49,3 +49,11 @@ Kandidaat: Tailscale Serve als privé-HTTPS reverse proxy voor de op loopback ge
 ## Statusregistratie
 
 Bewijsniveaus: IMPLEMENTED, VERIFIED, NOT TESTED, BLOCKED. Geen claim 'secure', 'production ready' of 'penetration tested' zonder passende testen en verslaglegging.
+
+## Implementatiestatus
+
+De eerste code bevat Origin- en fetch-sitecontrole, een Secure/HttpOnly/SameSite=Strict host-only cookie, expliciete lokale pairingbevestiging, gehashte apparaatcredentials in Keychain, intrekking, sessie-/idle-expiry en een lokale Stop die reconnect blokkeert tot Resume. WebSocket-frames én fragmentaggregatie, inputmailbox en HTTP-bodies zijn begrensd; schermframes wachten op ack. Pairing rate limits zijn globaal en blijven bij een nieuwe code behouden.
+
+Deze maatregelen zijn broncode, geen beveiligingscertificering. Host-tests moeten op macOS draaien; daadwerkelijke permissies, cookies via TLS-proxy, revocation, cleanup en input moeten nog fysiek worden gevalideerd. Zie `VALIDATION.md`. Een bestaand apparaatcredential kan opnieuw een sessie openen zonder nieuwe lokale pairing tot expiry/revocation; Stop schakelt dat uit. Pairingcodes en tickets blijven alleen tijdelijk in geheugen; browser-cookie bevat het ruwe credential, Keychain alleen de hash.
+
+De service worker cachet uitsluitend de publieke shell en gehashte JS/CSS; geen API, frames, input, tokens of offlinebediening. Een verloren verbinding wordt niet automatisch hersteld. De app is niet gevalideerd voor onbeheerd of publiek netwerkgebruik.

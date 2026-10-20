@@ -30,5 +30,9 @@ it('requires explicit reconnect after transport loss',()=>{
  const s=vi.fn(),c=new Connection(s,async()=>{});c.connect();Socket.all[0].onclose?.();vi.advanceTimersByTime(60000);expect(Socket.all).toHaveLength(1);expect(s).toHaveBeenLastCalledWith('disconnected','Session ended. Reconnect explicitly.');
 });
 it('bounds outgoing queue',()=>{
- const c=new Connection(vi.fn(),async()=>{});c.connect();Socket.all[0].bufferedAmount=9000;c.send({type:'ping'});expect(Socket.all[0].sent).toHaveLength(0);c.disconnect();
+ const c=new Connection(vi.fn(),async()=>{});c.connect();Socket.all[0].bufferedAmount=9000;c.send({type:'ping'});expect(Socket.all[0].sent).toHaveLength(0);expect(Socket.all[0].readyState).toBe(3);c.disconnect();
+});
+it('ignores stale socket hello after a replacement connection',async()=>{
+ const status=vi.fn(),c=new Connection(status,async()=>{});c.connect();const old=Socket.all[0];c.connect();
+ await old.onmessage?.({data:'{"type":"hello","version":1}'});expect(status).toHaveBeenLastCalledWith('authenticating');c.disconnect();
 });

@@ -1,6 +1,6 @@
 # Architectuur — Forge Remote
 
-**Status:** ontwerpbeslissingen voor Codex; niet geïmplementeerd.
+**Status:** eerste broncode-implementatie aanwezig. Webbuild/tests VERIFIED; native uitvoering en fysieke integratie NOT TESTED.
 
 ## Componenten
 
@@ -61,3 +61,11 @@ Bij Tailscale Serve moet de iPhone binnen dezelfde tailnet toegang hebben; Serve
 - Tailscale Serve CLI: https://tailscale.com/docs/reference/tailscale-cli/serve
 
 Geen van deze links is uitvoeringsbewijs. Houd de werkelijke gebruikte SDK- en browserversies bij tijdens bouwen.
+
+## Eerste implementatie
+
+`apps/mac` is een Swift Package met SwiftUI-menubarapp. Vapor verzorgt HTTP en WebSocket-framing op 127.0.0.1:9876; een eigen begrensde upgrader stelt ook fragmentaggregatielimieten in. Dit vervangt de aanvankelijke Network.framework-voorkeur om HTTP/upgradeparsing niet zelf te implementeren. De trust boundary en loopbackbinding blijven hetzelfde.
+
+`PairingFlow` beheert eenmalige code/ticket/approval; `DeviceStore` bewaart gehashte credentials in Keychain; `HostModel` serialiseert sessies op de main actor. `ScreenCapture` heeft een één-frame-mailbox, de sessie wacht op browser-ack en `InputController` houdt ingedrukte keys/buttons bij. Een geometriewijziging sluit veilig af; reconnect vernieuwt de captatie.
+
+`apps/web` gebruikt dezelfde origin voor statische assets, API en WSS. Geen cloudrelay of credentialopslag in JavaScript. Browserstatus volgt de echte protocol-handshake; automatische reconnect/input replay is bewust uitgeschakeld. Trackpad beweegt relatief, Desktop ondersteunt directe touch-drag. Details: `packages/protocol/README.md`.

@@ -9,10 +9,10 @@ async function api(path:string,body:object){
 }
 function App(){
  const [state,setState]=useState<State>('disconnected'),[error,setError]=useState(''),[code,setCode]=useState(''),[mode,setMode]=useState('Desktop'),[text,setText]=useState('');
- const canvas=useRef<HTMLCanvasElement>(null),meta=useRef({width:0,height:0,epoch:0}),active=useRef(false),ticket=useRef(''),[paired,setPaired]=useState(false);
+ const canvas=useRef<HTMLCanvasElement>(null),meta=useRef({width:0,height:0,epoch:0}),active=useRef(false),lastPointer=useRef({x:.5,y:.5}),ticket=useRef(''),[paired,setPaired]=useState(false);
  const conn=useRef<Connection|null>(null);
- if(!conn.current)conn.current=new Connection((s,e)=>{setState(s);if(e)setError(e);if(s!=='connected'){meta.current={width:0,height:0,epoch:0};const c=canvas.current;c?.getContext('2d')?.clearRect(0,0,c.width,c.height);}},async(blob,m)=>{
-  const image=new Image(),url=URL.createObjectURL(blob);try{await new Promise<void>((resolve,reject)=>{image.onload=()=>resolve();image.onerror=reject;image.src=url;});if(!active.current)return;
+ if(!conn.current)conn.current=new Connection((s,e)=>{setState(s);if(e)setError(e);if(s!=='connected'){meta.current={width:0,height:0,epoch:0};const c=canvas.current;c?.getContext('2d')?.clearRect(0,0,c.width,c.height);}},async(blob,m,current)=>{
+  const image=new Image(),url=URL.createObjectURL(blob);try{await new Promise<void>((resolve,reject)=>{image.onload=()=>resolve();image.onerror=reject;image.src=url;});if(!active.current||!current())return;
   const c=canvas.current;if(c){c.width=m.width;c.height=m.height;c.getContext('2d')?.drawImage(image,0,0,m.width,m.height);meta.current=m;}}finally{URL.revokeObjectURL(url);}
  });
  useEffect(()=>{active.current=state==='connected';},[state]);
@@ -28,7 +28,8 @@ function App(){
   if(action==='down')c.setPointerCapture(e.pointerId);
   if(action==='move'&&e.pointerType==='touch'&&!c.hasPointerCapture(e.pointerId))return;
   const p=pointInImage(e.clientX,e.clientY,c.getBoundingClientRect(),meta.current);
-  if(p)conn.current?.send({type:'pointer',...p,epoch:meta.current.epoch,action,button:e.button===2?1:0});
+  if(p)lastPointer.current=p;
+  if(p||action==='up')conn.current?.send({type:'pointer',...(p||lastPointer.current),epoch:meta.current.epoch,action,button:e.button===2?1:0});
   if(action==='up'&&c.hasPointerCapture(e.pointerId))c.releasePointerCapture(e.pointerId);
  }
  const sendText=()=>{if(text){conn.current?.send({type:'text',text:text.slice(0,256)});setText('');}};

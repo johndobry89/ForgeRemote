@@ -5,12 +5,13 @@ export class Connection {
   private timer?:ReturnType<typeof setInterval>;
   private decoding=false;
   private generation=0;
-  constructor(private status:(s:State,error?:string)=>void,private frame:(blob:Blob,meta:Extract<ServerMessage,{type:'frame'}>)=>Promise<void>){}
+  constructor(private status:(s:State,error?:string)=>void,private frame:(blob:Blob,meta:Extract<ServerMessage,{type:'frame'}>,current:()=>boolean)=>Promise<void>){}
   connect(){
     this.disconnect(); const generation=this.generation; this.status('authenticating');
     if(location.protocol!=='https:'){this.status('error','A trusted HTTPS connection is required.');return;}
     const ws=new WebSocket(`wss://${location.host}/socket`); this.socket=ws; ws.binaryType='blob';
     ws.onmessage=async event=>{
+      if(generation!==this.generation||this.socket!==ws)return;
       try{
         if(typeof event.data==='string'){
           const m=parseServer(JSON.parse(event.data));
@@ -20,7 +21,7 @@ export class Connection {
         }else{
           if(!(event.data instanceof Blob)||!this.pending||event.data.size>2_000_000||this.decoding)throw Error('Invalid frame');
           const meta=this.pending; this.pending=undefined;this.decoding=true;
-          await this.frame(event.data,meta);this.decoding=false;
+          await this.frame(event.data,meta,()=>generation===this.generation&&this.socket===ws);this.decoding=false;
           if(generation===this.generation)this.send({type:'ack',id:meta.id});
         }
       }catch{if(generation===this.generation){this.disconnect();this.status('error','Connection rejected or invalid stream. Pair again if access expired.');}}
@@ -28,6 +29,6 @@ export class Connection {
     ws.onclose=()=>{if(generation===this.generation){this.disconnect();this.status('disconnected','Session ended. Reconnect explicitly.');}};
     ws.onerror=()=>{if(generation===this.generation){this.disconnect();this.status('error','Cannot connect. Check HTTPS, pairing and the Mac.');}};
   }
-  send(m:ClientMessage){if(this.socket?.readyState===WebSocket.OPEN&&this.socket.bufferedAmount<8192)this.socket.send(JSON.stringify(m));}
+  send(m:ClientMessage){if(this.socket?.readyState!==WebSocket.OPEN)return;if(this.socket.bufferedAmount>=8192){this.disconnect();this.status('error','Connection congested. Input released; reconnect explicitly.');return;}this.socket.send(JSON.stringify(m));}
   disconnect(){this.generation++;clearInterval(this.timer);this.timer=undefined;this.socket?.close();this.socket=undefined;this.pending=undefined;this.decoding=false;this.status('disconnected');}
 }

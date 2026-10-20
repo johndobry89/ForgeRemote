@@ -1,6 +1,6 @@
 // Only immutable Vite assets and public shell files. Never API, socket, frames or input.
 const CACHE='forge-shell-v1';
-const SHELL=['/','/index.html','/icon.svg','/manifest.webmanifest'];
+const SHELL=['/','/index.html','/icon.svg','/manifest.webmanifest','/apple-touch-icon.png','/icon-192.png','/icon-512.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))));
 self.addEventListener('fetch',event=>{
