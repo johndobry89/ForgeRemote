@@ -8,14 +8,19 @@ struct Device: Codable, Identifiable {
     var expires: Date
 }
 struct DeviceStore {
-    private let service = "dev.forgeremote.devices.v1"
-    private(set) var devices: [Device] = []
-    init() throws {
+    private static let service = "dev.forgeremote.devices.v1"
+    private(set) var devices: [Device]
+    private let write: ([Device]) throws -> Void
+    init() throws { try self.init(load: Self.load, write: Self.persist) }
+    init(load: () throws -> [Device], write: @escaping ([Device]) throws -> Void) throws {
+        self.write = write; devices = try load()
+    }
+    private static func load() throws -> [Device] {
         var item: CFTypeRef?
         let status = SecItemCopyMatching([kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: "devices", kSecReturnData: true, kSecMatchLimit: kSecMatchLimitOne] as CFDictionary, &item)
-        if status == errSecItemNotFound { return }
+        if status == errSecItemNotFound { return [] }
         guard status == errSecSuccess, let data = item as? Data else { throw StoreError.keychain }
-        devices = try JSONDecoder().decode([Device].self, from: data)
+        return try JSONDecoder().decode([Device].self, from: data)
     }
     static func randomToken() throws -> String {
         var bytes = [UInt8](repeating: 0, count: 32)
@@ -32,6 +37,9 @@ struct DeviceStore {
     }
     mutating func revoke(_ id: String) throws { try save(devices.filter { $0.id != id }) }
     private mutating func save(_ next: [Device]) throws {
+        try write(next); devices = next
+    }
+    private static func persist(_ next: [Device]) throws {
         let data = try JSONEncoder().encode(next)
         let query: [CFString: Any] = [kSecClass: kSecClassGenericPassword, kSecAttrService: service, kSecAttrAccount: "devices"]
         let status = SecItemUpdate(query as CFDictionary, [kSecValueData: data] as CFDictionary)
@@ -41,7 +49,6 @@ struct DeviceStore {
             add[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
             guard SecItemAdd(add as CFDictionary, nil) == errSecSuccess else { throw StoreError.keychain }
         } else if status != errSecSuccess { throw StoreError.keychain }
-        devices = next
     }
     enum StoreError: Error { case keychain, random, capacity }
 }
