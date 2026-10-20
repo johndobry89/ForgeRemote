@@ -1,6 +1,7 @@
 import SwiftUI
 import Vapor
 import ApplicationServices
+import Security
 
 @MainActor final class HostModel: ObservableObject {
     @Published var status = "Stopped"

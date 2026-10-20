@@ -21,7 +21,7 @@
 
 Swift/Xcode/Apple SDKs and a macOS desktop are absent. Native compilation/test execution and actual permissions/Keychain/ScreenCaptureKit/CGEvent runtime validation require a Mac. A physical iPhone and trusted private HTTPS are required for integration and PWA-install verification. Nothing in a passing web build establishes these outcomes.
 
-GitHub API is unavailable to the supplied CLI authentication; draft PR creation and Actions status/log verification may remain unavailable. No new token was requested or extracted from the Git proxy.
+GitHub API is unavailable to the supplied CLI authentication; draft PR creation (`gh pr create --draft`) and Actions status retrieval (`gh run list`) both returned Forbidden. No PR was created or CI result verified. No new token was requested or extracted from the Git proxy.
 
 ## Required physical acceptance run
 

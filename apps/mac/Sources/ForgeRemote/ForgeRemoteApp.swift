@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 @main @MainActor struct ForgeRemoteApp: App {
     @StateObject private var host = HostModel()
