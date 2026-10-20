@@ -14,7 +14,7 @@ import Security
     private var store: DeviceStore?
     private var service: LocalService?
     private let capture = ScreenCapture()
-    private let input = InputController()
+    private let input: InputController
     private var socket: WebSocket?
     private var sessionID = UUID()
     private var deviceID: String?
@@ -26,11 +26,12 @@ import Security
     private var monitor: Task<Void,Never>?
     private var captureTask: Task<Void,Never>?
     private var ready = false
-    init() {
-        do { store = try DeviceStore(); devices = store?.devices ?? [] } catch { status = "Keychain unavailable — startup blocked" }
+    init(input: InputController? = nil, deviceStore: DeviceStore? = nil, startMonitor: Bool = true) {
+        self.input = input ?? InputController()
+        do { store = try deviceStore ?? DeviceStore(); devices = store?.devices ?? [] } catch { status = "Keychain unavailable — startup blocked" }
         capture.output = { [weak self] data,w,h,bounds in Task { @MainActor in self?.frame(data,w,h,bounds) } }
         capture.failure = { [weak self] in Task { @MainActor in self?.endSession("Screen capture stopped") } }
-        monitor = Task { [weak self] in
+        if startMonitor { monitor = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
                 guard let self else { return }
@@ -38,7 +39,7 @@ import Security
                 self.pairing.expire()
                 self.pairingCode = self.pairing.code; self.pendingName = self.pairing.name
             }
-        }
+        } }
     }
     func requestPermissions() {
         CGRequestScreenCaptureAccess()

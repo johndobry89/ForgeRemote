@@ -5,6 +5,9 @@ import ApplicationServices
     private var keys: Set<Int> = []
     private var buttons: Set<Int> = []
     private var location = CGPoint.zero
+    private static let modifiers: [(Int, CGEventFlags)] = [
+        (55, .maskCommand), (56, .maskShift), (58, .maskAlternate), (59, .maskControl)
+    ]
     var bounds = CGRect.zero
     private let permission: () -> Bool
     private let post: (CGEvent) -> Void
@@ -12,7 +15,13 @@ import ApplicationServices
         self.permission = permission; self.post = post
     }
     var allowed: Bool { permission() }
-    private func emit(_ event: CGEvent?) { if let event { post(event) } }
+    private func emit(_ event: CGEvent?) {
+        guard let event else { return }
+        // A nil CGEventSource can inherit local keyboard flags. Every event must
+        // describe our tracked remote state, including synthetic release events.
+        event.flags = flags
+        post(event)
+    }
     func apply(_ c: Command) {
         guard allowed else { releaseAll(); return }
         switch c.type {
@@ -27,10 +36,10 @@ import ApplicationServices
             else if buttons.contains(1) { kind = .rightMouseDragged }
             else { kind = .mouseMoved }
             let event = CGEvent(mouseEventSource: nil, mouseType: kind, mouseCursorPosition: location, mouseButton: mouse)
-            event?.flags = flags; emit(event)
+            emit(event)
         case "scroll":
             let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: Int32(-(c.dy ?? 0)), wheel2: Int32(-(c.dx ?? 0)), wheel3: 0)
-            event?.flags = flags; emit(event)
+            emit(event)
         case "text":
             guard let text = c.text else { return }
             let units = Array(text.utf16)
@@ -43,18 +52,32 @@ import ApplicationServices
             guard let code = c.code, let down = c.down else { return }
             if down { keys.insert(code) } else { keys.remove(code) }
             let event = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(code), keyDown: down)
-            event?.flags = flags; emit(event)
+            emit(event)
         default: break
         }
     }
     private var flags: CGEventFlags {
         var result: CGEventFlags = []
-        for (code,flag) in [(55,CGEventFlags.maskCommand),(56,.maskShift),(58,.maskAlternate),(59,.maskControl)] where keys.contains(code) { result.insert(flag) }
+        for (code,flag) in Self.modifiers where keys.contains(code) { result.insert(flag) }
         return result
     }
     func releaseAll() {
-        for code in keys { emit(CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(code), keyDown: false)) }
-        for button in buttons { emit(CGEvent(mouseEventSource: nil, mouseType: button == 0 ? .leftMouseUp : .rightMouseUp, mouseCursorPosition: location, mouseButton: button == 0 ? .left : .right)) }
-        keys.removeAll(); buttons.removeAll()
+        // Release buttons and ordinary keys while their modifiers are still held,
+        // then release modifiers individually. Set iteration order is undefined.
+        for button in buttons.sorted() {
+            buttons.remove(button)
+            emit(CGEvent(mouseEventSource: nil, mouseType: button == 0 ? .leftMouseUp : .rightMouseUp, mouseCursorPosition: location, mouseButton: button == 0 ? .left : .right))
+        }
+        let modifierCodes = Set(Self.modifiers.map { $0.0 })
+        for code in keys.subtracting(modifierCodes).sorted() {
+            keys.remove(code)
+            emit(CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(code), keyDown: false))
+        }
+        for (code, _) in Self.modifiers where keys.contains(code) {
+            keys.remove(code)
+            // CoreGraphics represents modifier transitions as flagsChanged, not
+            // keyUp. Removing the key first gives this event the remaining flags.
+            emit(CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(code), keyDown: false))
+        }
     }
 }
