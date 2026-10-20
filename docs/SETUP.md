@@ -80,3 +80,21 @@ npm run dev -w apps/web
 ```
 
 Loopback Vite serves the real UI, with pairing disabled over HTTP. Cloud Chromium path is `/usr/bin/chromium`. For other machines, `npx playwright install chromium` installs a project test browser; use `CI=1 npm run test:browser` to select Playwright's managed browser or set `CHROMIUM_PATH` to your existing executable. This does not validate Mac integration.
+
+
+## macOS CI evidence and physical acceptance
+
+The mac job uploads a `mac-validation-<source SHA>` artifact containing the
+SwiftPM-generated Package.resolved, XCTest XML, test log and release-build log.
+Test failures remain failures; release compilation runs independently after
+successful dependency resolution. Download the actual lockfile and commit it at
+`apps/mac/Package.resolved`; do not invent package revisions. Once a lockfile is
+committed, CI rejects any resolution diff and builds/tests with
+`--disable-automatic-resolution` to prevent silent drift.
+
+PR #1's marked validation section is updated by the runner for this featurebranch,
+using actual step outcomes and test counts. Always compare its source SHA with
+the PR head; an old run does not validate new changes. Complete the separate
+[physical acceptance record](PHYSICAL_ACCEPTANCE.md) on real devices even when CI
+is green. Tests capturing CGEvents do not prove OS event delivery after permission
+revocation.
