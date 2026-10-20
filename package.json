@@ -1,0 +1,21 @@
+{
+  "name": "forge-remote",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/protocol"
+  ],
+  "scripts": {
+    "build": "npm run build -w apps/web",
+    "test": "vitest run",
+    "typecheck": "npm run typecheck -w apps/web",
+    "test:browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "vitest": "^3.2.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

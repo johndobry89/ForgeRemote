@@ -1,0 +1,120 @@
+name: Validate
+on:
+  push:
+    branches: [main, 'feature/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: node --test .github/scripts/report-validation.test.cjs
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+  mac:
+    runs-on: macos-15
+    outputs:
+      test_count: ${{ steps.results.outputs.test_count }}
+      failures: ${{ steps.results.outputs.failures }}
+      errors: ${{ steps.results.outputs.errors }}
+      skipped: ${{ steps.results.outputs.skipped }}
+      artifact_url: ${{ steps.artifact.outputs.artifact-url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: swift --version && xcodebuild -version
+      - name: Resolve Swift dependencies
+        id: resolve
+        working-directory: apps/mac
+        run: |
+          mkdir -p "$RUNNER_TEMP/forge-validation"
+          swift package resolve
+          if git ls-files --error-unmatch Package.resolved >/dev/null 2>&1; then
+            git diff --exit-code -- Package.resolved
+          fi
+          cp Package.resolved "$RUNNER_TEMP/forge-validation/Package.resolved"
+      - name: Swift tests
+        id: tests
+        working-directory: apps/mac
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift test --disable-automatic-resolution --jobs 3 \
+            --xunit-output "$RUNNER_TEMP/forge-validation/swift-tests.xml" \
+            2>&1 | tee "$RUNNER_TEMP/forge-validation/swift-tests.log"
+      - name: macOS release build
+        id: release
+        if: ${{ !cancelled() && steps.resolve.outcome == 'success' }}
+        working-directory: apps/mac
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift build --disable-automatic-resolution -c release --jobs 3 \
+            2>&1 | tee "$RUNNER_TEMP/forge-validation/swift-release.log"
+      - name: Record actual test results
+        id: results
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          report = Path(os.environ['RUNNER_TEMP']) / 'forge-validation/swift-tests.xml'
+          if not report.exists():
+              raise SystemExit('No current-run XCTest XML: tests are not verified')
+          cases = list(ET.parse(report).getroot().iter('testcase'))
+          counts = {'test_count': len(cases)}
+          counts.update({key: sum(case.find(tag) is not None for case in cases)
+                         for key, tag in [('failures', 'failure'), ('errors', 'error'), ('skipped', 'skipped')]})
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for key, value in counts.items():
+                  print(f'{key}={value}', file=output)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
+              print(f"XCTest: {counts}. Physical Mac/iPhone acceptance: NOT TESTED.", file=output)
+          if not cases:
+              raise SystemExit('Zero tests do not establish readiness')
+          PY
+      - name: Preserve resolved versions and native evidence
+        id: artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-validation-${{ github.sha }}
+          path: ${{ runner.temp }}/forge-validation/
+          if-no-files-found: error
+  report-pr:
+    # Report only the authorized in-repository featurebranch push. Fork PRs
+    # receive no write token and duplicate pull_request runs do not edit the PR.
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/feature/forge-remote-mvp' }}
+    needs: [web, mac]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update PR 1 with runner evidence
+        uses: actions/github-script@v7
+        env:
+          MAC_TEST_COUNT: ${{ needs.mac.outputs.test_count }}
+          MAC_FAILURES: ${{ needs.mac.outputs.failures }}
+          MAC_ERRORS: ${{ needs.mac.outputs.errors }}
+          MAC_SKIPPED: ${{ needs.mac.outputs.skipped }}
+          MAC_ARTIFACT_URL: ${{ needs.mac.outputs.artifact_url }}
+          MAC_JOB_RESULT: ${{ needs.mac.result }}
+          WEB_JOB_RESULT: ${{ needs.web.result }}
+        with:
+          script: |
+            const report = require('./.github/scripts/report-validation.cjs');
+            await report({github, context, core});
