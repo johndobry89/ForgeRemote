@@ -1,0 +1,49 @@
+# macOS
+.DS_Store
+.AppleDouble
+
+# Xcode / Swift
+DerivedData/
+.build/
+.swiftpm/xcode/package.xcworkspace/xcuserdata/
+*.xcuserstate
+*.xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+*.ipa
+*.app/
+*.dSYM/
+*.dSYM.zip
+*.xcarchive/
+
+# Node / frontend
+node_modules/
+dist/
+build/
+coverage/
+playwright-report/
+test-results/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# Local config / private keys (allow documented samples)
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.p8
+*.mobileprovision
+*.cer
+*.crt
+*.secrets.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
